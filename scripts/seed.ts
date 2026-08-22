@@ -25,14 +25,6 @@ const passwordIsPublic = PASSWORD === DEV_PASSWORD
 const credentials = passwordIsPublic ? `${EMAIL} / ${PASSWORD}` : `${EMAIL} (password: SEED_PASSWORD)`
 
 async function main(): Promise<void> {
-  // The owner account this creates can spend money and read every project in
-  // the org. Reaching a public URL with the password that ships in this file is
-  // the same as having no password, so refuse rather than seed a known account.
-  if (process.env.NODE_ENV === 'production' && passwordIsPublic) {
-    console.error('refusing to seed: set SEED_PASSWORD — the development default is public')
-    process.exit(1)
-  }
-
   const runtime = await createRuntime()
 
   const existingUser = await runtime.db.get<{ id: string; org_id: string }>('SELECT id, org_id FROM users WHERE email = ?', [EMAIL])
@@ -44,6 +36,18 @@ async function main(): Promise<void> {
     userId = String(existingUser.id)
     console.log(`reusing existing account ${EMAIL}`)
   } else {
+    // The owner account this creates can spend money and read every project in
+    // the org. Reaching a public URL with the password that ships in this file is
+    // the same as having no password, so refuse rather than create a known
+    // account. The check lives here, not at the top of main(): this seed runs on
+    // every container boot, and once the owner exists the password is never used
+    // again — refusing to boot over an unused variable would turn a healthy,
+    // already-seeded deployment into a crash loop.
+    if (process.env.NODE_ENV === 'production' && passwordIsPublic) {
+      console.error('refusing to create the owner account: set SEED_PASSWORD — the development default is public')
+      await runtime.close()
+      process.exit(1)
+    }
     const org = await runtime.projects.createOrg('Summit Arts')
     const user = await runtime.auth.createUser({
       orgId: org.id,
