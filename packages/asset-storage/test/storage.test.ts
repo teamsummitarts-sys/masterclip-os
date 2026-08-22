@@ -101,7 +101,7 @@ describe('local path staging', () => {
     const stored = await storage.putFile('proj/k/i/source.txt', source)
     const dest = join(root, 'staged', 'copy.txt')
     expect(await storage.materialize(stored.key, dest)).toBe(dest)
-    expect(storage.localPath(stored.key)).toContain('proj/k/i/source.txt')
+    expect(storage.localPath(stored.key)).toContain(join('proj', 'k', 'i', 'source.txt'))
   })
 })
 

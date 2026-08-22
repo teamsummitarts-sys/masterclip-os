@@ -12,6 +12,7 @@ import { execFileSync } from 'node:child_process'
 import { mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { packageBin } from './lib/package-bin.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 mkdirSync(join(root, 'dist'), { recursive: true })
@@ -43,5 +44,5 @@ for (const target of targets) {
   console.log(`built ${target.out}`)
 }
 
-execFileSync(join(root, 'node_modules/.bin/vite'), ['build'], { cwd: join(root, 'apps/web'), stdio: 'inherit' })
+execFileSync(process.execPath, [packageBin('vite'), 'build'], { cwd: join(root, 'apps/web'), stdio: 'inherit' })
 console.log('built apps/web/dist')

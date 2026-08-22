@@ -9,6 +9,7 @@ import { tmpdir } from 'node:os'
 import { spawn } from 'node:child_process'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { packageBin } from './lib/package-bin.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const scratch = mkdtempSync(join(tmpdir(), 'masterclip-e2e-'))
@@ -23,7 +24,7 @@ if (!existsSync(join(webDist, 'index.html'))) {
 // The screenshot run needs renders to actually complete, so start a worker too.
 const children = []
 const spawnService = (entry) =>
-  spawn(join(root, 'node_modules/.bin/tsx'), [entry], {
+  spawn(process.execPath, [packageBin('tsx'), entry], {
   cwd: root,
   stdio: 'inherit',
   env: {

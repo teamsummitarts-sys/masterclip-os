@@ -7,15 +7,17 @@
 import { spawn } from 'node:child_process'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { packageBin } from './lib/package-bin.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-const tsx = join(root, 'node_modules/.bin/tsx')
-const vite = join(root, 'node_modules/.bin/vite')
+const node = process.execPath
+const tsx = packageBin('tsx')
+const vite = packageBin('vite')
 
 const services = [
-  { name: 'api   ', color: '[36m', cmd: tsx, args: ['watch', 'apps/api/src/main.ts'], cwd: root },
-  { name: 'worker', color: '[35m', cmd: tsx, args: ['watch', 'apps/worker/src/main.ts'], cwd: root },
-  { name: 'web   ', color: '[33m', cmd: vite, args: [], cwd: join(root, 'apps/web') },
+  { name: 'api   ', color: '[36m', cmd: node, args: [tsx, 'watch', 'apps/api/src/main.ts'], cwd: root },
+  { name: 'worker', color: '[35m', cmd: node, args: [tsx, 'watch', 'apps/worker/src/main.ts'], cwd: root },
+  { name: 'web   ', color: '[33m', cmd: node, args: [vite], cwd: join(root, 'apps/web') },
 ]
 
 const children = services.map((service) => {

@@ -106,5 +106,5 @@ if (problems.length > 0) {
   process.exit(1)
 }
 
-execFileSync('node', [join(root, 'scripts/typecheck.mjs')], { stdio: 'inherit', cwd: root })
+execFileSync(process.execPath, [join(root, 'scripts/typecheck.mjs')], { stdio: 'inherit', cwd: root })
 process.stdout.write('lint clean\n')
