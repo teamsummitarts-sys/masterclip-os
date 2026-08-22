@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
-import { formatUsd, loadConfig, maskSecret } from '@masterclip/shared'
+import { applyEnvFile, formatUsd, loadConfig, maskSecret } from '@masterclip/shared'
 import { migrationStatus } from '@masterclip/database'
 import { checkTools } from '@masterclip/media-tools'
 import { contractSummary, runProviderContract, type CanonicalRenderRequest, type PriceQuote } from '@masterclip/provider-core'
@@ -25,6 +25,7 @@ interface Ctx {
 }
 
 async function main(): Promise<number> {
+  applyEnvFile()
   const argv = process.argv.slice(2)
   const flags: Record<string, string | boolean> = {}
   const args: string[] = []

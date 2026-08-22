@@ -1,9 +1,10 @@
 import { resolve } from 'node:path'
 import { createRuntime } from '@masterclip/runtime'
-import { loadConfig } from '@masterclip/shared'
+import { applyEnvFile, loadConfig } from '@masterclip/shared'
 import { buildServer } from './server.js'
 
 async function main(): Promise<void> {
+  applyEnvFile()
   const config = loadConfig()
   const runtime = await createRuntime()
   const webRoot = process.env.WEB_ROOT ?? resolve(process.cwd(), 'apps/web/dist')

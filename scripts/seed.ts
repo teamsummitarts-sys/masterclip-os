@@ -7,7 +7,12 @@
  * Builder does that, against the mock provider by default.
  */
 import { createRuntime } from '@masterclip/runtime'
+import { applyEnvFile } from '@masterclip/shared'
 import { CharacterRecord, EnvironmentRecord, emptyShot } from '@masterclip/shot-schema'
+
+// Before the reads below, not inside main(): SEED_EMAIL and SEED_PASSWORD are
+// captured at module load.
+applyEnvFile()
 
 const DEV_PASSWORD = 'masterclip-dev-password'
 const EMAIL = process.env.SEED_EMAIL ?? 'producer@masterclip.local'

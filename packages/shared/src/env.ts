@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { parseEnv } from 'node:util'
 import { z } from 'zod'
 import { registerSecret } from './redact.js'
 import { usdToMicros, type MicroUsd } from './money.js'
@@ -202,4 +204,37 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env, force = fals
 
 export function resetConfigCache(): void {
   cached = null
+}
+
+/**
+ * Applies a `.env` file to `target` (normally `process.env`), skipping every
+ * variable that is already set — the same precedence as `node --env-file`, so
+ * a properly configured environment can never be overridden by a checkout's
+ * local file.
+ *
+ * Nothing loads `.env` on its own: Node only reads one under an explicit
+ * `--env-file` flag, which NODE_OPTIONS refuses to carry through pnpm and tsx.
+ * Until the entry points called this, the file `masterclip init` creates and
+ * `.env.example` documents was silently ignored — `providers health` reported
+ * a key "not set" while the operator could see it sitting in `.env`.
+ * Deployments are unaffected: `.dockerignore` keeps `.env` out of every image,
+ * and real environment variables win regardless.
+ *
+ * Returns the names of the variables applied, never their values, so callers
+ * can report what happened without a secret reaching a log.
+ */
+export function applyEnvFile(path = '.env', target: NodeJS.ProcessEnv = process.env): string[] {
+  let content: string
+  try {
+    content = readFileSync(path, 'utf8')
+  } catch {
+    return []
+  }
+  const applied: string[] = []
+  for (const [key, value] of Object.entries(parseEnv(content))) {
+    if (target[key] !== undefined) continue
+    target[key] = value
+    applied.push(key)
+  }
+  return applied
 }

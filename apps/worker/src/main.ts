@@ -1,6 +1,6 @@
 import { createRuntime, RenderService, QueueWorker, QUEUES } from '@masterclip/runtime'
 import { JOB_TYPES } from '@masterclip/queue'
-import { loadConfig } from '@masterclip/shared'
+import { applyEnvFile, loadConfig } from '@masterclip/shared'
 
 /**
  * The render worker.
@@ -11,6 +11,7 @@ import { loadConfig } from '@masterclip/shared'
  * crash returns leased jobs to the pool instead of losing them.
  */
 async function main(): Promise<void> {
+  applyEnvFile()
   const config = loadConfig()
   const runtime = await createRuntime({ workerId: `worker-${process.pid}` })
   const render = new RenderService(runtime)

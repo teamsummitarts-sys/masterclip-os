@@ -9,9 +9,10 @@
  * PostgreSQL deployment ahead of a deploy rather than during one.
  */
 import { createDb, migrationStatus } from '@masterclip/database'
-import { loadConfig } from '@masterclip/shared'
+import { applyEnvFile, loadConfig } from '@masterclip/shared'
 
 async function main(): Promise<void> {
+  applyEnvFile()
   const config = loadConfig()
   const target = config.DB_DRIVER === 'postgres' ? config.DATABASE_URL.replace(/:[^:@/]*@/, ':***@') : config.SQLITE_PATH
 

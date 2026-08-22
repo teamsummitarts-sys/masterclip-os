@@ -1,6 +1,10 @@
+import { mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   AppError,
+  applyEnvFile,
   applyRate,
   backoffDelayMs,
   canonicalJson,
@@ -134,5 +138,40 @@ describe('constant-time compare', () => {
     expect(safeEqual('abc', 'abd')).toBe(false)
     expect(safeEqual('abc', 'abcdef')).toBe(false)
     expect(safeEqual('', '')).toBe(true)
+  })
+})
+
+describe('.env file application', () => {
+  const envFile = (content: string): string => {
+    const path = join(mkdtempSync(join(tmpdir(), 'masterclip-env-')), '.env')
+    writeFileSync(path, content)
+    return path
+  }
+
+  it('applies file values and reports names, not values', () => {
+    const path = envFile('GOOGLE_API_KEY=from-file\n# comment\nLOG_LEVEL="debug"\n')
+    const target: NodeJS.ProcessEnv = {}
+    const applied = applyEnvFile(path, target)
+    expect(target.GOOGLE_API_KEY).toBe('from-file')
+    expect(target.LOG_LEVEL).toBe('debug')
+    expect(applied.sort()).toEqual(['GOOGLE_API_KEY', 'LOG_LEVEL'])
+    expect(applied.join(' ')).not.toContain('from-file')
+  })
+
+  it('never overrides a variable the real environment already set', () => {
+    // Same precedence as `node --env-file`: a stray checkout file must not be
+    // able to redirect a deployment whose configuration comes from real env.
+    const path = envFile('GOOGLE_BASE_URL=https://attacker.example\nGOOGLE_API_KEY=file-key\n')
+    const target: NodeJS.ProcessEnv = { GOOGLE_BASE_URL: 'https://generativelanguage.googleapis.com' }
+    const applied = applyEnvFile(path, target)
+    expect(target.GOOGLE_BASE_URL).toBe('https://generativelanguage.googleapis.com')
+    expect(target.GOOGLE_API_KEY).toBe('file-key')
+    expect(applied).toEqual(['GOOGLE_API_KEY'])
+  })
+
+  it('is a no-op without a file, so a clean checkout and production behave as before', () => {
+    const target: NodeJS.ProcessEnv = { LOG_LEVEL: 'info' }
+    expect(applyEnvFile(join(tmpdir(), 'masterclip-env-none', '.env'), target)).toEqual([])
+    expect(target).toEqual({ LOG_LEVEL: 'info' })
   })
 })
