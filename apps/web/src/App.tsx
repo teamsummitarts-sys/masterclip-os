@@ -79,7 +79,9 @@ export function App() {
       <div className="app">
         <nav className="sidebar">
           <div className="brand">
-            <h1>Masterclip OS</h1>
+            <h1>
+              <img className="brand-mark" src="/motion-wordmark.png" alt="Motion" width={440} height={413} />
+            </h1>
             <div className="sub">cinematic render factory</div>
           </div>
           <div className="nav">
