@@ -4,6 +4,7 @@ import { AppError, formatUsd, maskSecret } from '@masterclip/shared'
 import { toNum, toStr } from '@masterclip/database'
 import { verifyCallbackToken } from '@masterclip/provider-core'
 import { ROUTING_PROFILES } from '@masterclip/model-router'
+import { HandoffRejected, verifyHandoff } from '@masterclip/auth'
 import type { Runtime } from '@masterclip/runtime'
 import { SESSION_COOKIE, requireAuth, requireProject } from '../server.js'
 import { clearCsrfCookie, issueCsrfCookie } from '../security/csrf.js'
@@ -40,6 +41,57 @@ export async function registerOpsRoutes(app: FastifyInstance, runtime: Runtime, 
     void reply.setCookie(SESSION_COOKIE, session.token, { httpOnly: true, sameSite: 'lax', path: '/', secure: runtime.config.NODE_ENV === 'production' })
     issueCsrfCookie(runtime, reply, session.token)
     return { user, org }
+  })
+
+  // Street Banker's suite sign-in hand-off. Street Banker is the account of
+  // record for every suite: it sends the person here with a short-lived signed
+  // token, and this verifies it, finds or creates the matching account by
+  // email and opens the session. No password crosses between the services. A
+  // token that fails is refused with the reason and a way back, never a loop.
+  app.get('/auth/street-banker', async (request, reply) => {
+    const secret = (process.env.SUITE_SSO_SECRET ?? '').trim()
+    const home = (process.env.STREET_BANKER_URL ?? 'https://app.streetbankermusic.com').replace(/\/+$/, '')
+    const refuse = (status: number, reason: string) =>
+      reply.code(status).type('text/html').send(
+        '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">' +
+          '<title>Sign in through Street Banker</title></head>' +
+          '<body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#0B0C0D;color:#F2EFE9;font-family:Archivo,system-ui,sans-serif">' +
+          '<main style="max-width:34rem;padding:2rem;border:1px solid rgba(242,239,233,.12);border-radius:14px;background:#101214">' +
+          '<h1 style="margin:0 0 .5rem;font-size:1.25rem">Sign in through Street Banker</h1>' +
+          `<p style="margin:0 0 1.25rem;color:#C9C5BC;line-height:1.5">${reason}</p>` +
+          `<a href="${home}/login" style="display:inline-block;padding:.7rem 1.1rem;border-radius:10px;background:#D4A93C;color:#1A1006;font-weight:700;text-decoration:none">Go to Street Banker</a>` +
+          '</main></body></html>',
+      )
+    const query = request.query as { token?: string }
+    if (!query.token) return refuse(401, 'This address needs a link from Street Banker.')
+    if (!secret) return refuse(503, 'Motion is not connected to Street Banker sign-in yet.')
+    let who
+    try {
+      who = verifyHandoff(query.token, secret, (process.env.SUITE_KEYS ?? 'motion').split(',').map((k) => k.trim()).filter(Boolean))
+    } catch (error) {
+      const reason = error instanceof HandoffRejected ? error.reason : 'bad signature'
+      const words: Record<string, string> = {
+        expired: 'The sign-in link has expired. Open Motion from Street Banker again.',
+        'wrong suite': 'That link was for a different suite.',
+      }
+      return refuse(401, words[reason] ?? 'The sign-in link could not be verified.')
+    }
+    // One organization per deployment: the first arrival founds it, as the
+    // first signup would. Owners named in OWNER_EMAILS arrive as owners;
+    // everybody else is a member and sees the projects they are added to.
+    const owners = (process.env.OWNER_EMAILS ?? '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
+    let org = await runtime.db.get<{ id: string }>('SELECT id FROM orgs ORDER BY created_at LIMIT 1')
+    const founding = !org
+    if (!org) org = await runtime.projects.createOrg('Street Banker')
+    const session = await runtime.auth.sessionForVouchedEmail({
+      email: who.email,
+      displayName: who.name,
+      orgId: toStr(org.id),
+      orgRole: founding || owners.includes(who.email) ? 'owner' : 'member',
+    })
+    void reply.setCookie(SESSION_COOKIE, session.token, { httpOnly: true, sameSite: 'lax', path: '/', secure: runtime.config.NODE_ENV === 'production' })
+    issueCsrfCookie(runtime, reply, session.token)
+    return reply.redirect('/')
   })
 
   app.post('/api/auth/login', async (request, reply) => {

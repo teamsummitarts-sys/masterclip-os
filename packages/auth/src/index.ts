@@ -88,7 +88,34 @@ export class AuthService {
     const storedHash = row ? toStr(row.password_hash) : 'scrypt$AAAAAAAAAAAAAAAAAAAAAA==$AAAA'
     const ok = await verifyPassword(password, storedHash)
     if (!row || !ok || row.disabled === 1) throw unauthorized('invalid email or password')
+    return this.startSession(row)
+  }
 
+  /**
+   * Opens a session for an account another authority has already vouched for:
+   * Street Banker's signed hand-off (suite-sso.ts). Finds the account by email,
+   * or creates it in `orgId` with a password nobody knows, since sign-in
+   * happens at Street Banker. Never re-enables a disabled account.
+   */
+  async sessionForVouchedEmail(input: {
+    email: string
+    displayName: string
+    orgId: string
+    orgRole: OrgRole
+  }): Promise<{ token: string; user: AuthUser; expiresAt: string; created: boolean }> {
+    const email = input.email.trim().toLowerCase()
+    let row = await this.db.get('SELECT * FROM users WHERE email = ?', [email])
+    let created = false
+    if (!row) {
+      await this.createUser({ orgId: input.orgId, email, displayName: input.displayName, password: randomToken(32), orgRole: input.orgRole })
+      row = await this.db.get('SELECT * FROM users WHERE email = ?', [email])
+      created = true
+    }
+    if (!row || row.disabled === 1) throw forbidden('account disabled')
+    return { ...(await this.startSession(row)), created }
+  }
+
+  private async startSession(row: Record<string, unknown>): Promise<{ token: string; user: AuthUser; expiresAt: string }> {
     const token = randomToken(32)
     const expiresAt = new Date(this.clock.now() + SESSION_TTL_MS).toISOString()
     await insertRow(this.db, 'sessions', {
@@ -177,3 +204,5 @@ function mapUser(row: Record<string, unknown>): AuthUser {
     orgRole: toStr(row.org_role) as OrgRole,
   }
 }
+
+export * from './suite-sso.js'
